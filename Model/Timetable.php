@@ -40,7 +40,7 @@ class Timetable extends Base
         }
 
         //Sort all timeslots by start time
-        array_usort($timetable, 
+        usort($timetable, 
             function($a,$b){
                 if ($a[0] == $b[0]) {
                     return 0;
@@ -131,7 +131,7 @@ class Timetable extends Base
         }
         
         //Sort all overtime timeslots by start time
-        array_usort($overtime_slots, 
+        usort($overtime_slots, 
             function($a,$b){
                 if ($a[0] == $b[0]) {
                     return 0;
