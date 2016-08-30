@@ -23,7 +23,16 @@ class Plugin extends Base
 
         // Calculate time spent according to the timetable
         $this->hook->on('model:subtask-time-tracking:calculate:time-spent', function($user_id, DateTime $start, DateTime $end) use ($container) {
-            return $container['timetable']->calculateEffectiveDuration($user_id, $start, $end);
+            $orig_duration   =  $container['timetable']->dateParser->getHours($start, $end);
+            $ttable_duration =  $container['timetable']->calculateEffectiveDuration($user_id, $start, $end);
+            
+            if($ttable_duration <= $orig_duration){
+                //Need to add overtime as needed
+                $overtime_hours = $container['timetable']->calculateAditionalOverTime($user_id, $start, $end);                
+                return $orig_duration;
+            }
+            
+            return $ttable_duration;
         });
 
         // Split calendar events according to the timetable

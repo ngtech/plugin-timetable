@@ -25,6 +25,150 @@ class Timetable extends Base
     private $overtime;
     private $timeoff;
 
+    
+    public function calculateAditionalOverTime($user_id, DateTime $start, DateTime $end){
+        $end_timetable = clone($end);
+        $end_timetable->setTime(23, 59);
+
+        $timetable = $this->calculate($user_id, $start, $end_timetable);
+        $found_start = false;
+        $hours = 0;
+
+        // The user has no timetable
+        if (empty($this->week)) {
+            return 0;
+        }
+
+        //Sort all timeslots by start time
+        array_usort($timetable, 
+            function($a,$b){
+                if ($a[0] == $b[0]) {
+                    return 0;
+                }
+                return ($a[0] < $b[0]) ? -1 : 1;
+        });
+                        
+        $found_start = false;
+        $found_end   = true;
+        $overtime_slots = [];
+        $overtime_hours = 0;
+        
+        foreach ($timetable as $slot) {
+            $isStartSlot = $this->dateParser->withinDateRange($start, $slot[0], $slot[1]);
+            $isEndSlot = $this->dateParser->withinDateRange($end, $slot[0], $slot[1]);
+                        
+            //Ignore slots that end before subtask start or start after subtask end
+            if( ( $slot[0] >= $end ) || ($slot[1] <= $slot[1])){
+                continue;
+            }
+            
+            //Check if this is the start slot
+            if($isStartSlot){
+                //This is a start slot - no need to add overtime before
+                $found_start = true;
+                if($isEndSlot){
+                    //This is also the end slot so no need for aditional overtime or checks - just return
+                    return 0;
+                }else{
+                    //Add overtime from slot end till task end
+                    $overtime_slots[] = ["start" => $slot[1], "end" => $end ];
+                    continue;
+                }
+            }else{
+                //This is not the start slot - it means that we need overtime before
+                //because slots are already sorted by start time
+                $overtime_slots[] = ["start" => $start,"end" => $slot[0]];
+                
+                if($isEndSlot){
+                    //This is the end slot so no need for aditional overtime on end
+                    continue;
+                }else{
+                    //Add overtime from slot end till task end
+                    $overtime_slots[] = ["start" => $slot[1], "end" => $end ];
+                    continue;
+                }
+            }
+        }
+        
+        //Trim Overtime
+        $do_loop = true;
+        while($do_loop){
+            $do_loop = false;
+            foreach ($timetable as &$tSlot) {
+                foreach ($overtime_slots as &$oSlot) {
+                     if($tSlot[0] <= $oSlot[0]){
+                        //Timesheet Slot begins before Overtime Slot starts or
+                        //TimeSlot and Overtime slot begin at the same time
+                        if($tSlot[1] < $oSlot[1]){
+                            //Timesheet Slot ends before Overtime Slot ends
+                            //Trim Overtime Slot - new start at end of current time slot
+                            $oSlot[0] = $oSlot[1];
+                        }elseif($tSlot[1] >= $oSlot[1]){
+                            //TimeSlot and Overtime slot ends at the same time
+                            // or Timesheet slot ends after Overtime Slot
+                            //Unset Overtime slot
+                            $oSlot[1] = $oSlot[0]; //Set duration 0
+                            unset($oSlot);
+                        }                     
+                     }else{
+                         //Timesheet slot begins after Overtime Slot
+                            if($oSlot[1] > $tSlot[1]){
+                                //Overtime Slot ends after Timesheet Slot - need to split to two overtime slots
+                                // -1- From Time Slot End to OverTime Slot End
+                                $overtime_slots[] = ["start" => $tSlot[1], "end" => $oSlot[1] ];
+                                // -2- From Overtime Slot Start to Time Slot Start
+                                $oSlot[1] = $tSlot[0]; //Adjust end of current overtime slot
+                                //Restart
+                                $do_loop = true;
+                                break 2;
+                            }elseif($tSlot[1] >= $oSlot[1]){
+                                //TimeSlot and Overtime slot end at the same time or 
+                                //Timesheet slot ends after Overtime Slot
+                                //Trim Overtime slot end
+                                $oSlot[1] = $tSlot[0]; //Adjust end of current overtime slot                                
+                            }                     
+                     }
+                }
+            }
+        }
+        
+        //Sort all overtime timeslots by start time
+        array_usort($overtime_slots, 
+            function($a,$b){
+                if ($a[0] == $b[0]) {
+                    return 0;
+                }
+                return ($a[0] < $b[0]) ? -1 : 1;
+        });        
+        
+        //Add not empty overtime slots to overtime table
+        foreach ($overtime_slots as &$oSlot => $key ) {
+            $do_loop = true;
+            while($do_loop){ 
+                $do_loop = false;
+                if( $oSlot[0]->format("Y-m-d") == $oSlot[1]->format("Y-m-d")){
+                    //Overtime begins and ends within the same day
+                    $this->container['timetableextra']->create($user_id, $oSlot[0]->format("Y-m-d"), false, $oSlot[0]->format("H:i:s") , $oSlot[0]->format("H:i:s"), $comment = 'Automaticaly added to cover tracked time');
+                    $overtime_hours += $this->dateParser->getHours($oSlot[0], $oSlot[1]);
+                }else{
+                    //Tracked time spans two or more days - add overtime for this day
+                    $thisday_start = $oSlot[0];
+                    $thisday_end   = clone($thisday_start);
+                    $thisday_end->setTime(23,59,59);
+                    $this->container['timetableextra']->create($user_id, $oSlot[0]->format("Y-m-d"), false, $thisday_start->format("H:i:s") , $thisday_end->format("H:i:s"), $comment = 'Automaticaly added to cover tracked time +');                
+                    $overtime_hours += $this->dateParser->getHours($thisday_start, $thisday_end);
+                    //   - adjust start and repeat
+                    $oSlot[0]->modify('+1 day');
+                    $oSlot[0]->setTime(0, 0, 0);
+                    $do_loop = true;
+                }           
+            }
+        }
+        
+        return $overtime_hours;
+        
+    }
+    
     /**
      * Get a set of events by using the intersection between the timetable and the time tracking data
      *
