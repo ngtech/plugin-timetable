@@ -94,21 +94,19 @@ class Timetable extends Base
         $do_loop = true;
         while($do_loop){
             $do_loop = false;
-            foreach ($timetable as &$tSlot) {
-                foreach ($overtime_slots as &$oSlot) {
+            foreach ($timetable as $tSlot) {
+                foreach ($overtime_slots as $oKey => $oSlot) {
                      if($tSlot[0] <= $oSlot[0]){
                         //Timesheet Slot begins before Overtime Slot starts or
                         //TimeSlot and Overtime slot begin at the same time
                         if($tSlot[1] < $oSlot[1]){
                             //Timesheet Slot ends before Overtime Slot ends
                             //Trim Overtime Slot - new start at end of current time slot
-                            $oSlot[0] = $oSlot[1];
+                            $overtime_slots[$oKey][0] = $oSlot[1];
                         }elseif($tSlot[1] >= $oSlot[1]){
                             //TimeSlot and Overtime slot ends at the same time
                             // or Timesheet slot ends after Overtime Slot
-                            //Unset Overtime slot
-                            $oSlot[1] = $oSlot[0]; //Set duration 0
-                            unset($oSlot);
+                            $overtime_slots[$oKey][1] = $oSlot[0]; //Set duration 0
                         }                     
                      }else{
                          //Timesheet slot begins after Overtime Slot
@@ -117,7 +115,7 @@ class Timetable extends Base
                                 // -1- From Time Slot End to OverTime Slot End
                                 $overtime_slots[] = ["start" => $tSlot[1], "end" => $oSlot[1] ];
                                 // -2- From Overtime Slot Start to Time Slot Start
-                                $oSlot[1] = $tSlot[0]; //Adjust end of current overtime slot
+                                $overtime_slots[$oKey][1] = $tSlot[0]; //Adjust end of current overtime slot
                                 //Restart
                                 $do_loop = true;
                                 break 2;
@@ -125,7 +123,7 @@ class Timetable extends Base
                                 //TimeSlot and Overtime slot end at the same time or 
                                 //Timesheet slot ends after Overtime Slot
                                 //Trim Overtime slot end
-                                $oSlot[1] = $tSlot[0]; //Adjust end of current overtime slot                                
+                                $overtime_slots[$oKey][1] = $tSlot[0]; //Adjust end of current overtime slot                                
                             }                     
                      }
                 }
@@ -142,7 +140,13 @@ class Timetable extends Base
         });        
         
         //Add not empty overtime slots to overtime table
-        foreach ($overtime_slots as &$oSlot => $key ) {
+        foreach ($overtime_slots as $oKey => $oSlot) {
+            
+            //Ignore zero length or invalid time slots
+            if($oSlot[1] <= $oSlot[0]){
+                continue;
+            }
+            
             $do_loop = true;
             while($do_loop){ 
                 $do_loop = false;
@@ -158,8 +162,8 @@ class Timetable extends Base
                     $this->container['timetableextra']->create($user_id, $oSlot[0]->format("Y-m-d"), false, $thisday_start->format("H:i:s") , $thisday_end->format("H:i:s"), $comment = 'Automaticaly added to cover tracked time +');                
                     $overtime_hours += $this->dateParser->getHours($thisday_start, $thisday_end);
                     //   - adjust start and repeat
-                    $oSlot[0]->modify('+1 day');
-                    $oSlot[0]->setTime(0, 0, 0);
+                    $overtime_slots[$oKey][0]->modify('+1 day');
+                    $overtime_slots[$oKey][0]->setTime(0, 0, 0);
                     $do_loop = true;
                 }           
             }
