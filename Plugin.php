@@ -66,7 +66,7 @@ class Plugin extends Base
 
     public function getPluginDescription()
     {
-        return t('Timetable management for users');
+        return t('Timetable management for users - Modified to Automatically track  / add overtime');
     }
 
     public function getPluginAuthor()
@@ -76,11 +76,11 @@ class Plugin extends Base
 
     public function getPluginVersion()
     {
-        return '1.0.8';
+        return '1.0.8.m';
     }
 
     public function getPluginHomepage()
     {
-        return 'https://github.com/kanboard/plugin-timetable';
+        return 'https://github.com/ngtech/plugin-timetable';
     }
 }
