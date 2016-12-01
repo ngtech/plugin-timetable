@@ -167,7 +167,7 @@ class Timetable extends Base
                 if( $oSlot[0]->format("Y-m-d") == $oSlot[1]->format("Y-m-d")){
                     error_log('adding overtime entry');
                     //Overtime begins and ends within the same day
-                    $this->container['timetableextra']->create($user_id, $oSlot[0]->format("Y-m-d"), false, $oSlot[0]->format("H:i:s") , $oSlot[0]->format("H:i:s"), $comment = 'Automaticaly added to cover tracked time');
+                    $this->container['timetableExtra']->create($user_id, $oSlot[0]->format("Y-m-d"), false, $oSlot[0]->format("H:i:s") , $oSlot[0]->format("H:i:s"), $comment = 'Automaticaly added to cover tracked time');
                     $overtime_hours += $this->dateParser->getHours($oSlot[0], $oSlot[1]);
                 }else{
                     error_log('adding overtime netry 2');
@@ -175,7 +175,7 @@ class Timetable extends Base
                     $thisday_start = $oSlot[0];
                     $thisday_end   = clone($thisday_start);
                     $thisday_end->setTime(23,59,59);
-                    $this->container['timetableextra']->create($user_id, $oSlot[0]->format("Y-m-d"), false, $thisday_start->format("H:i:s") , $thisday_end->format("H:i:s"), $comment = 'Automaticaly added to cover tracked time +');                
+                    $this->container['timetableExtra']->create($user_id, $oSlot[0]->format("Y-m-d"), false, $thisday_start->format("H:i:s") , $thisday_end->format("H:i:s"), $comment = 'Automaticaly added to cover tracked time +');                
                     $overtime_hours += $this->dateParser->getHours($thisday_start, $thisday_end);
                     //   - adjust start and repeat
                     $overtime_slots[$oKey][0]->modify('+1 day');
